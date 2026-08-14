@@ -80,19 +80,24 @@ jobs:
         run: |
           set -euo pipefail
           BUNDLE_ID="com.konsumer.Renoise2Mod"
-          BUNDLE_DIR="$BUNDLE_ID.xrnx"
+          OUTPUT_FILE="$BUNDLE_ID.xrnx"
+          # Staged under a name that does NOT match $OUTPUT_FILE -- zip'ing "../$OUTPUT_FILE"
+          # from inside a directory of that same name collides with the directory itself
+          # (zip tries to update the "existing archive" at that path, which is actually a
+          # directory, and fails with "Zip file structure invalid").
+          STAGE_DIR="xrnx-bundle"
 
-          mkdir -p "$BUNDLE_DIR/bin"
-          cp tool/manifest.xml "$BUNDLE_DIR/"
-          cp tool/main.lua "$BUNDLE_DIR/"
-          cp artifacts/renoise2mod-linux/renoise2mod "$BUNDLE_DIR/bin/renoise2mod-linux"
-          cp artifacts/renoise2mod-darwin/renoise2mod-darwin "$BUNDLE_DIR/bin/renoise2mod-darwin"
-          cp artifacts/renoise2mod-windows/renoise2mod.exe "$BUNDLE_DIR/bin/renoise2mod-windows.exe"
-          chmod +x "$BUNDLE_DIR/bin/renoise2mod-linux" "$BUNDLE_DIR/bin/renoise2mod-darwin"
+          mkdir -p "$STAGE_DIR/bin"
+          cp tool/manifest.xml "$STAGE_DIR/"
+          cp tool/main.lua "$STAGE_DIR/"
+          cp artifacts/renoise2mod-linux/renoise2mod "$STAGE_DIR/bin/renoise2mod-linux"
+          cp artifacts/renoise2mod-darwin/renoise2mod-darwin "$STAGE_DIR/bin/renoise2mod-darwin"
+          cp artifacts/renoise2mod-windows/renoise2mod.exe "$STAGE_DIR/bin/renoise2mod-windows.exe"
+          chmod +x "$STAGE_DIR/bin/renoise2mod-linux" "$STAGE_DIR/bin/renoise2mod-darwin"
 
           # Zip the bundle's *contents* (manifest.xml at the zip root), matching how Renoise
           # expects "a zip file with the .xrnx extension and the tool's contents" to be laid out.
-          (cd "$BUNDLE_DIR" && zip -r "../$BUNDLE_ID.xrnx" .)
+          (cd "$STAGE_DIR" && zip -r "../$OUTPUT_FILE" .)
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
