@@ -191,7 +191,7 @@ local function show_export_dialog()
                 id = "ticks_box",
                 min = 0,
                 max = 31,
-                value = 0,
+                value = song.transport.tpl,
                 width = 150,
                 tooltip = "0 = use the song's own value",
               },
