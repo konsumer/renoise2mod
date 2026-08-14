@@ -80,6 +80,13 @@ local function run_export(xrns_path, output_path, opts)
     table.insert(args, tostring(opts.ticks))
   end
 
+  -- Zip preserves Unix executable bits, but Renoise's own install-time extraction of a .xrnx
+  -- bundle doesn't necessarily restore them -- the binary can land on disk without +x even
+  -- though it was executable in the release archive. io.chmod is a Renoise-specific addition
+  -- seemingly meant for exactly this; harmless to call on Windows (permission bits are ignored
+  -- there, per the API docs) so it's done unconditionally rather than gated on platform.
+  io.chmod(binary_path(), 755)
+
   local command = table.concat(args, " ")
   local exit_ok = execute_succeeded(os.execute(command))
 
