@@ -72,9 +72,13 @@ pub fn build_envelope_points(
     sustain_enabled: bool,
     loop_enabled: bool,
 ) -> Vec<EnvelopePoint> {
+    // Divide first, then round the final result -- rounding `127.0 * y` and *then*
+    // integer-dividing by 2 systematically undershoots by 1 for values like y=1.0 (127.0.round()
+    // = 127, 127/2 truncates to 63 instead of the correct 64). Verified against real envelope
+    // data: y=1.0 must map to 64, not 63.
     let mut points: Vec<EnvelopePoint> = raw_points
         .iter()
-        .map(|&(x, y)| (x.round() as i32, ((127.0 * y).abs() as i32) / 2))
+        .map(|&(x, y)| (x.round() as i32, (127.0 * y / 2.0).abs().round() as i32))
         .collect();
     points.sort_by_key(|p| p.0);
 

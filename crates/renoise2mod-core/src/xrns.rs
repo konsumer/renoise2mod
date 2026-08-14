@@ -435,8 +435,13 @@ fn extract_sample(sample: Node) -> SampleData {
 }
 
 /// The Renoise schema has changed how instrument envelopes are represented at least once. This
-/// handles both known device shapes; see the module-level docs for the `/10.665` rescale used by
-/// the newer shape (reverse-engineered in the original from real files, not principled).
+/// handles both known device shapes. Field names and nesting for the "Compatibility" shape below
+/// are verified against a real, current Renoise-exported `.xrns` file (its envelope-specific
+/// fields are all prefixed `Envelope...`, distinct from the device's own top-level `IsActive`;
+/// points live under a nested `EnvelopeNodes > Points` and are `"x,y,curve"` triples, not `"x,y"`
+/// pairs -- getting either of those wrong silently discards every point). The newer shape's exact
+/// field names are unverified (no sample file available) and kept as a best-effort guess, along
+/// with the `/10.665` point-x rescale it's assumed to need.
 fn extract_envelopes(sample_generator: Node, data: &mut InstrumentData) {
     const NEWER_SCHEMA_POINT_DIVISOR: f32 = 10.665;
 
@@ -468,24 +473,34 @@ fn extract_envelopes(sample_generator: Node, data: &mut InstrumentData) {
             _ => continue,
         };
 
-        *envelope = EnvelopeData {
-            enabled: find_child(device, "IsActive")
-                .and_then(text)
-                .map(|s| s == "true")
-                .unwrap_or(false),
-            fade_out: find_child(device, "FadeOut")
-                .and_then(text)
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(0),
-            sustain_enabled: find_child(device, "SustainEnabled")
-                .and_then(text)
-                .map(|s| s == "true")
-                .unwrap_or(false),
-            loop_enabled: find_child(device, "LoopMode")
-                .and_then(text)
-                .map(|s| s != "Off")
-                .unwrap_or(false),
-            ..Default::default()
+        let (
+            active_tag,
+            sustain_active_tag,
+            sustain_pos_tag,
+            loop_start_tag,
+            loop_end_tag,
+            loop_mode_tag,
+            decay_tag,
+        ) = if is_older_shape {
+            (
+                "EnvelopeIsActive",
+                "EnvelopeSustainIsActive",
+                "EnvelopeSustainPos",
+                "EnvelopeLoopStart",
+                "EnvelopeLoopEnd",
+                "EnvelopeLoopMode",
+                "EnvelopeDecay",
+            )
+        } else {
+            (
+                "IsActive",
+                "SustainEnabled",
+                "SustainPosition",
+                "LoopStart",
+                "LoopEnd",
+                "LoopMode",
+                "FadeOut",
+            )
         };
 
         let divisor = if is_newer_shape {
@@ -494,7 +509,29 @@ fn extract_envelopes(sample_generator: Node, data: &mut InstrumentData) {
             1.0
         };
 
-        if let Some(points_node) = find_child(device, "Points") {
+        *envelope = EnvelopeData {
+            enabled: find_child(device, active_tag)
+                .and_then(text)
+                .map(|s| s == "true")
+                .unwrap_or(false),
+            fade_out: numeric_field(device, decay_tag)
+                .map(|v| v as u16)
+                .unwrap_or(0),
+            sustain_enabled: find_child(device, sustain_active_tag)
+                .and_then(text)
+                .map(|s| s == "true")
+                .unwrap_or(false),
+            loop_enabled: find_child(device, loop_mode_tag)
+                .and_then(text)
+                .map(|s| s != "Off")
+                .unwrap_or(false),
+            ..Default::default()
+        };
+
+        // The older/"Compatibility" shape nests its point list under EnvelopeNodes; fall back to
+        // looking directly under the device for the (unverified) newer shape.
+        let points_container = find_child(device, "EnvelopeNodes").unwrap_or(device);
+        if let Some(points_node) = find_child(points_container, "Points") {
             envelope.points = points_node
                 .children()
                 .filter(|c| c.has_tag_name("Point"))
@@ -503,17 +540,17 @@ fn extract_envelopes(sample_generator: Node, data: &mut InstrumentData) {
                 .collect();
         }
 
-        envelope.sustain_point_x = find_child(device, "SustainPosition")
+        envelope.sustain_point_x = find_child(device, sustain_pos_tag)
             .and_then(text)
             .and_then(|s| s.parse::<f32>().ok())
             .map(|x| x / divisor)
             .unwrap_or(0.0);
-        envelope.loop_start_x = find_child(device, "LoopStart")
+        envelope.loop_start_x = find_child(device, loop_start_tag)
             .and_then(text)
             .and_then(|s| s.parse::<f32>().ok())
             .map(|x| x / divisor)
             .unwrap_or(0.0);
-        envelope.loop_end_x = find_child(device, "LoopEnd")
+        envelope.loop_end_x = find_child(device, loop_end_tag)
             .and_then(text)
             .and_then(|s| s.parse::<f32>().ok())
             .map(|x| x / divisor)
@@ -521,10 +558,24 @@ fn extract_envelopes(sample_generator: Node, data: &mut InstrumentData) {
     }
 }
 
-/// Parses a Renoise `"x,y"` envelope point string, rescaling `x` by `divisor`.
+/// Reads a numeric field that may either be a plain text node (`<Tag>1024</Tag>`) or wrap its
+/// value in a nested `<Value>` element (`<Tag><Value>1024</Value>...</Tag>`), matching the two
+/// styles Renoise uses for scalar device parameters across its schema shapes.
+fn numeric_field(node: Node, tag: &str) -> Option<f32> {
+    let field = find_child(node, tag)?;
+    if let Some(value_node) = find_child(field, "Value") {
+        text(value_node)?.parse().ok()
+    } else {
+        text(field)?.parse().ok()
+    }
+}
+
+/// Parses a Renoise envelope point string. Modern Renoise writes `"x,y,curve"` triples (a
+/// tension/curve parameter XM's point-based envelopes can't represent, so it's dropped); only the
+/// first two comma-separated fields are used, tolerant of either 2 or 3+ parts.
 fn parse_point(s: &str, divisor: f32) -> Option<(f32, f32)> {
-    let (x, y) = s.split_once(',')?;
-    let x: f32 = x.trim().parse().ok()?;
-    let y: f32 = y.trim().parse().ok()?;
+    let mut parts = s.split(',');
+    let x: f32 = parts.next()?.trim().parse().ok()?;
+    let y: f32 = parts.next()?.trim().parse().ok()?;
     Some((x / divisor, y))
 }
