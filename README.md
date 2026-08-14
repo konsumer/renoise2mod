@@ -76,4 +76,5 @@ cargo build
 cargo test
 cargo clippy --all-targets -- -D warnings
 cargo fmt
+cargo xtask tool
 ```

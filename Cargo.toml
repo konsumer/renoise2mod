@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/renoise2mod-core", "crates/renoise2mod"]
+members = ["crates/renoise2mod-core", "crates/renoise2mod", "xtask"]
 
 [workspace.package]
 version = "0.1.0"
