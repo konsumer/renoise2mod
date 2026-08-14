@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<RenoiseScriptingTool doc_version="0">
+  <ApiVersion>6.2</ApiVersion>
+  <Id>com.konsumer.Renoise2Mod</Id>
+  <Version>1</Version>
+  <Author>konsumer [konsumer@jetboystudio.com]</Author>
+  <Name>Renoise2Mod</Name>
+  <Category>Export, Rendering</Category>
+  <Description>Export the current song to a classic .mod (ProTracker) or .xm (FastTracker II) tracker file. A full native rewrite of xrns2xmod, bundled with cross-platform binaries -- no separate install needed.</Description>
+  <Homepage>https://github.com/konsumer/renoise2mod</Homepage>
+  <License>MIT</License>
+  <Platform>Windows, Mac, Linux</Platform>
+</RenoiseScriptingTool>

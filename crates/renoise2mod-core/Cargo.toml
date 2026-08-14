@@ -1,0 +1,16 @@
+[package]
+name = "renoise2mod-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Renoise .xrns to .mod/.xm conversion library"
+
+[dependencies]
+zip = { version = "2", default-features = false, features = ["deflate"] }
+roxmltree = "0.20"
+thiserror = "2"
+symphonia = { version = "0.5", features = ["wav", "flac", "mp3", "vorbis", "aiff", "isomp4", "pcm"] }
+regex = "1"
+
+[dev-dependencies]

@@ -1,0 +1,15 @@
+[package]
+name = "renoise2mod"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "Convert Renoise .xrns songs to classic .mod/.xm tracker files"
+
+[[bin]]
+name = "renoise2mod"
+path = "src/main.rs"
+
+[dependencies]
+renoise2mod-core = { path = "../renoise2mod-core" }
+clap = { version = "4", features = ["derive"] }

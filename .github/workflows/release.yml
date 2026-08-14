@@ -1,0 +1,101 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-musl
+      - name: Install musl toolchain
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --target x86_64-unknown-linux-musl -p renoise2mod
+      - uses: actions/upload-artifact@v4
+        with:
+          name: renoise2mod-linux
+          path: target/x86_64-unknown-linux-musl/release/renoise2mod
+          if-no-files-found: error
+
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --target x86_64-apple-darwin -p renoise2mod
+      - run: cargo build --release --locked --target aarch64-apple-darwin -p renoise2mod
+      - name: Combine into a universal binary
+        run: |
+          lipo -create -output renoise2mod-darwin \
+            target/x86_64-apple-darwin/release/renoise2mod \
+            target/aarch64-apple-darwin/release/renoise2mod
+      - uses: actions/upload-artifact@v4
+        with:
+          name: renoise2mod-darwin
+          path: renoise2mod-darwin
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    env:
+      # Static CRT so the binary needs no MSVC redistributable installed.
+      RUSTFLAGS: -C target-feature=+crt-static
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked --target x86_64-pc-windows-msvc -p renoise2mod
+      - uses: actions/upload-artifact@v4
+        with:
+          name: renoise2mod-windows
+          path: target/x86_64-pc-windows-msvc/release/renoise2mod.exe
+          if-no-files-found: error
+
+  package:
+    needs: [build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Assemble .xrnx bundle
+        run: |
+          set -euo pipefail
+          BUNDLE_ID="com.konsumer.Renoise2Mod"
+          BUNDLE_DIR="$BUNDLE_ID.xrnx"
+
+          mkdir -p "$BUNDLE_DIR/bin"
+          cp tool/manifest.xml "$BUNDLE_DIR/"
+          cp tool/main.lua "$BUNDLE_DIR/"
+          cp artifacts/renoise2mod-linux/renoise2mod "$BUNDLE_DIR/bin/renoise2mod-linux"
+          cp artifacts/renoise2mod-darwin/renoise2mod-darwin "$BUNDLE_DIR/bin/renoise2mod-darwin"
+          cp artifacts/renoise2mod-windows/renoise2mod.exe "$BUNDLE_DIR/bin/renoise2mod-windows.exe"
+          chmod +x "$BUNDLE_DIR/bin/renoise2mod-linux" "$BUNDLE_DIR/bin/renoise2mod-darwin"
+
+          # Zip the bundle's *contents* (manifest.xml at the zip root), matching how Renoise
+          # expects "a zip file with the .xrnx extension and the tool's contents" to be laid out.
+          (cd "$BUNDLE_DIR" && zip -r "../$BUNDLE_ID.xrnx" .)
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: com.konsumer.Renoise2Mod.xrnx
+          generate_release_notes: true
