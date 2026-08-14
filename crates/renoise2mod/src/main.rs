@@ -236,7 +236,7 @@ fn main() -> ExitCode {
     let bytes = match output {
         Ok(b) => b,
         Err(e) => {
-            eprintln!("error: {e}");
+            log.log(LogLevel::Error, e.to_string());
             return ExitCode::FAILURE;
         }
     };
@@ -250,10 +250,20 @@ fn main() -> ExitCode {
         .unwrap_or_else(|| args.input.with_extension(extension));
 
     if let Err(e) = std::fs::write(&out_path, &bytes) {
-        eprintln!("error: failed to write {}: {e}", out_path.display());
+        log.log(
+            LogLevel::Error,
+            format!("failed to write {}: {e}", out_path.display()),
+        );
         return ExitCode::FAILURE;
     }
 
+    // Routed through the log too (not just stdout) so a caller reading only the --log file (e.g.
+    // the Renoise tool, which can't reliably read stdout from a spawned process) still sees
+    // final success confirmation, not just the intermediate progress messages.
+    log.log(
+        LogLevel::Info,
+        format!("wrote {} bytes to {}", bytes.len(), out_path.display()),
+    );
     println!("wrote {} bytes to {}", bytes.len(), out_path.display());
 
     if log.had_errors {

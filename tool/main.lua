@@ -36,6 +36,20 @@ local function read_file(path)
   return content
 end
 
+-- os.execute's success return is not consistent across Lua versions: Lua 5.4 returns a boolean
+-- (true on exit code 0), while Lua 5.1/LuaJIT returns the raw numeric exit code directly (0 on
+-- success). Handle both so this doesn't misreport success as failure depending on which Lua
+-- Renoise happens to embed.
+local function execute_succeeded(result)
+  if type(result) == "boolean" then
+    return result
+  elseif type(result) == "number" then
+    return result == 0
+  else
+    return false
+  end
+end
+
 -- Runs the bundled CLI and returns (success, output_path, log_text).
 local function run_export(xrns_path, output_path, opts)
   local log_path = os.tmpname()
@@ -67,17 +81,18 @@ local function run_export(xrns_path, output_path, opts)
   end
 
   local command = table.concat(args, " ")
-  -- os.execute's first return value reflects the CLI's actual exit code (ExitCode::SUCCESS vs
-  -- ExitCode::FAILURE) -- a more reliable success signal than checking for the output file, which
-  -- could stay behind from an earlier run at the same path even if this run failed outright.
-  local exit_ok = os.execute(command)
+  local exit_ok = execute_succeeded(os.execute(command))
 
   local log_text = read_file(log_path) or ""
   os.remove(log_path)
 
   local had_error = log_text:find("%[ERROR%]") ~= nil
+  -- The CLI logs a final "wrote N bytes..." confirmation on success (in addition to stdout) --
+  -- an extra, independent success signal on top of os.execute's return value, since that value's
+  -- meaning isn't fully certain across every Lua build Renoise might embed.
+  local wrote_confirmation = log_text:find("%[INFO%] wrote %d+ bytes") ~= nil
 
-  return exit_ok == true and not had_error, output_path, log_text
+  return (exit_ok or wrote_confirmation) and not had_error, output_path, log_text
 end
 
 local function show_export_dialog()
