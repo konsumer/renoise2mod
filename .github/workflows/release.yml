@@ -99,8 +99,26 @@ jobs:
           # expects "a zip file with the .xrnx extension and the tool's contents" to be laid out.
           (cd "$STAGE_DIR" && zip -r "../$OUTPUT_FILE" .)
 
+      - name: Assemble standalone CLI zips
+        run: |
+          set -euo pipefail
+
+          mkdir -p cli-linux cli-macos cli-windows
+          cp artifacts/renoise2mod-linux/renoise2mod cli-linux/renoise2mod
+          cp artifacts/renoise2mod-darwin/renoise2mod-darwin cli-macos/renoise2mod
+          cp artifacts/renoise2mod-windows/renoise2mod.exe cli-windows/renoise2mod.exe
+          chmod +x cli-linux/renoise2mod cli-macos/renoise2mod
+
+          (cd cli-linux && zip "../renoise2mod-linux.zip" renoise2mod)
+          (cd cli-macos && zip "../renoise2mod-macos.zip" renoise2mod)
+          (cd cli-windows && zip "../renoise2mod-windows.zip" renoise2mod.exe)
+
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          files: com.konsumer.Renoise2Mod.xrnx
+          files: |
+            com.konsumer.Renoise2Mod.xrnx
+            renoise2mod-linux.zip
+            renoise2mod-macos.zip
+            renoise2mod-windows.zip
           generate_release_notes: true

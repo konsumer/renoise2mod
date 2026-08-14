@@ -19,8 +19,15 @@ Once installed, use **File > Export to MOD/XM...** on a saved song.
 ## Standalone CLI
 
 The same conversion engine is also a plain command-line tool, `renoise2mod`, if you'd rather script
-conversions or don't need Renoise's UI. Grab the binary for your platform from the same
-[release](https://github.com/konsumer/renoise2mod/releases/latest) page.
+conversions or don't need Renoise's UI. Each [release](https://github.com/konsumer/renoise2mod/releases/latest)
+includes a standalone zip per platform, separate from the `.xrnx`:
+
+- `renoise2mod-linux.zip`
+- `renoise2mod-macos.zip` (universal: Intel + Apple Silicon)
+- `renoise2mod-windows.zip`
+
+Download the one for your platform, unzip it, and run the `renoise2mod` binary directly (on
+macOS/Linux you may need `chmod +x renoise2mod` first).
 
 ```sh
 renoise2mod song.xrns --type xm
@@ -77,4 +84,7 @@ cargo test
 cargo clippy --all-targets -- -D warnings
 cargo fmt
 cargo xtask tool
+
+# this is for mac, do this however you do it
+cp -R tool /Applications/Renoise.app/Contents/Resources/Scripts/Tools/com.konsumer.Renoise2Mod.xrnx
 ```
