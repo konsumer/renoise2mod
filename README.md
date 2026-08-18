@@ -75,8 +75,9 @@ A Cargo workspace:
 - `crates/renoise2mod-core` — the conversion library (`.xrns` parsing, MOD/XM writers, audio
   decode/resample/encode)
 - `crates/renoise2mod` — the CLI binary
-- `tool/` — the Renoise Tool source (`manifest.xml` + `main.lua`); CI drops platform binaries into
-  `tool/bin/` before zipping it into the `.xrnx` release artifact
+- `tool/` — the Renoise Tool source (`manifest.xml`, `main.lua`, `cover.png`/`thumbnail.png`, and
+  `PAGE.md` for the tools site listing); CI drops platform binaries into `tool/bin/` before zipping
+  it into the `.xrnx` release artifact
 
 ```sh
 cargo build
